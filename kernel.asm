@@ -90,6 +90,13 @@ cur_bank dw -1
 
 put_pixel:
     pusha
+    mov ax, [rx]
+    cmp ax, 640
+    jae .done
+    mov ax, [ry]
+    cmp ax, 480
+    jae .done
+
     ; offset = y * 640 + x
     mov ax, [ry]
     mov cx, 640
@@ -103,6 +110,7 @@ put_pixel:
     mov es, ax
     mov al, [rc]
     mov [es:di], al
+.done:
     popa
     ret
 
@@ -124,6 +132,9 @@ fill_rect:
     or si, si
     jz .done
 .row_loop:
+    cmp cx, 480
+    jae .row_next
+
     push cx
     ; Calculate starting offset for the row
     mov ax, cx
@@ -134,7 +145,7 @@ fill_rect:
     
     mov bp, [rw]                    ; BP = pixels left in row
     or bp, bp
-    jz .row_next
+    jz .row_pop
 .pixel_loop:
     push dx
     call set_bank
@@ -143,14 +154,18 @@ fill_rect:
     mov es, bx
     
     ; How many pixels can we draw in this bank?
-    mov bx, 0xFFFF
-    sub bx, ax
-    inc bx                          ; BX = pixels until end of bank
-    
+    mov bx, ax
+    neg bx                          ; bx = 65536 - ax
+    jz .full_bank
+    cmp bp, bx
+    jbe .use_bp
+    mov dx, bx                      ; dx = pixels to end of bank
+    jmp .do_chunk
+.full_bank:
     mov dx, bp
-    cmp dx, bx
-    jbe .do_chunk
-    mov dx, bx                      ; DX = min(pixels_left, pixels_to_bank_end)
+    jmp .do_chunk
+.use_bp:
+    mov dx, bp
 
 .do_chunk:
     mov bx, dx                      ; Store chunk size
@@ -166,8 +181,9 @@ fill_rect:
     sub bp, bx
     jnz .pixel_loop
     
-.row_next:
+.row_pop:
     pop cx
+.row_next:
     inc cx
     dec si
     jnz .row_loop
@@ -541,31 +557,31 @@ draw_desktop:
     mov byte [rc], 5
     call fill_rect
 
-    ; Start Button
+    ; Start Button (Scaled up for 640x480)
     mov byte [rc], 3
-    mov word [rx], 10
-    mov word [ry], 448
-    mov word [rw], 10
-    mov word [rh], 10
+    mov word [rx], 12
+    mov word [ry], 445
+    mov word [rw], 14
+    mov word [rh], 14
     call fill_rect
-    mov word [rx], 22
+    mov word [rx], 28
     call fill_rect
-    mov word [rx], 10
-    mov word [ry], 460
+    mov word [rx], 12
+    mov word [ry], 461
     call fill_rect
-    mov word [rx], 22
+    mov word [rx], 28
     call fill_rect
 
     ; Search box
-    mov word [rx], 50
+    mov word [rx], 60
     mov word [ry], 448
-    mov word [rw], 150
+    mov word [rw], 200
     mov word [rh], 24
     mov byte [rc], 14
     call fill_rect
     
     mov byte [rc], 8
-    mov word [rx], 60
+    mov word [rx], 70
     mov word [ry], 456
     mov bx, str_search
     call draw_string
@@ -754,5 +770,5 @@ str_press_key    db "[Press any key to reboot]",0
 str_search       db "Type here to search",0
 str_clock        db "12:34",0
 
-; Pad to 64 sectors
-times 32768-($-$$) db 0
+; Pad to 127 sectors (to match boot.asm load count)
+times 65024-($-$$) db 0
