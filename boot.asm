@@ -20,6 +20,7 @@ start:
     mov ss, ax
     mov sp, 0x7C00
     sti
+    cld
 
     mov [boot_drive], dl
 

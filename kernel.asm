@@ -10,6 +10,7 @@ KERNEL_START:
     mov ax, cs
     mov ds, ax
     mov es, ax
+    cld
 
     ; --- Initialize VESA VBE Mode 0x101 (640x480x256) ---
     mov ax, 0x4F02
@@ -52,7 +53,11 @@ KERNEL_START:
 
     ; ---- Desktop Main Loop ----
 main_loop:
+    cmp byte [dirty], 0
+    je .idle
+    mov byte [dirty], 0
     call draw_desktop
+.idle:
     call handle_interaction
     ; Simple VSync-ish delay to reduce flicker
     mov dx, 0x03DA
@@ -127,6 +132,7 @@ clear_screen:
 
 fill_rect:
     pusha
+    cld
     mov cx, [ry]                    ; CX = current Y
     mov si, [rh]                    ; SI = rows left
     or si, si
@@ -197,6 +203,7 @@ fill_rect:
 
 draw_char:
     pusha
+    push word [ry]
     push fs
     mov ax, [font_ptr_seg]
     mov fs, ax
@@ -229,11 +236,13 @@ draw_char:
     pop cx
     loop .row
     pop fs
+    pop word [ry]
     popa
     ret
 
 draw_string:
     pusha
+    cld
     mov si, bx
 .next:
     lodsb
@@ -336,6 +345,7 @@ mouse_callback:
     mov word [mouse_y], 479
 
 .done:
+    mov byte [cs:dirty], 1
     pop ds
     popa
     pop bp
@@ -376,6 +386,7 @@ handle_interaction:
     cmp word [mouse_y], bx
     jg .not_close
     mov byte [win_visible], 0
+    mov byte [dirty], 1
     jmp .done
 
 .not_close:
@@ -404,6 +415,7 @@ handle_interaction:
     mov ax, [mouse_y]
     sub ax, [win_y]
     mov [drag_offset_y], ax
+    mov byte [dirty], 1
     jmp .done
 
 .do_drag:
@@ -413,6 +425,7 @@ handle_interaction:
     mov ax, [mouse_y]
     sub ax, [drag_offset_y]
     mov [win_y], ax
+    mov byte [dirty], 1
     jmp .done
 
 .not_clicking:
@@ -697,6 +710,7 @@ ry dw 0
 rw dw 0
 rh dw 0
 rc db 0
+dirty db 1
 frame dw 0
 head db 0
 
@@ -737,6 +751,7 @@ palette_data:
 
 install_palette:
     pusha
+    cld
     mov dx, 0x03C8
     mov al, 0
     out dx, al
