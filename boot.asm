@@ -26,13 +26,13 @@ start:
     mov si, msg_boot
     call print_str
 
-    ; --- Load kernel: 32 sectors starting at LBA 2 -> ES:BX = 0x1000:0x0000 ---
+    ; --- Load kernel: 64 sectors starting at LBA 2 -> ES:BX = 0x1000:0x0000 ---
     mov ax, 0x1000
     mov es, ax
     xor bx, bx
 
     mov ah, 0x02            ; BIOS: read sectors
-    mov al, 32              ; 32 * 512 = 16 KB
+    mov al, 64              ; 64 * 512 = 32 KB
     mov ch, 0
     mov cl, 2               ; sector 2 (sector 1 is this bootloader)
     mov dh, 0
